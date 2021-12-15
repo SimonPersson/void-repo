@@ -1,0 +1,13 @@
+diff --git a/pash b/pash
+index 4180492..1058d19 100755
+--- a/pash
++++ b/pash
+@@ -177,7 +177,7 @@ main() {
+ 
+     # Look for both 'gpg' and 'gpg2',
+     # preferring 'gpg2' if it is available.
+-    command -v gpg  >/dev/null 2>&1 && gpg=gpg
++    command -v gpg1  >/dev/null 2>&1 && gpg=gpg1
+     command -v gpg2 >/dev/null 2>&1 && gpg=gpg2
+ 
+     [ "$gpg" ] ||

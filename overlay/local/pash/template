@@ -1,0 +1,16 @@
+pkgname=pash
+version=999
+patch_args=-p1
+revision=1
+depends="gnupg1"
+short_desc="A simple password manager using GPG written in POSIX sh."
+maintainer='Simon Persson <simon@flaskpost.org>'
+license="MIT"
+homepage="A simple password manager using GPG written in POSIX sh."
+distfiles="https://github.com/dylanaraps/pash/archive/refs/heads/master.zip"
+checksum=98b1964471018d4abac16ecf4650971ae469491c2270f533b71c09582b62d228
+wrksrc=pash-master
+
+do_install() {
+	vbin pash
+}

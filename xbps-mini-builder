@@ -1,0 +1,67 @@
+#!/bin/sh
+
+# Jump to the directory that owns this script
+cd "${0%/*}" || exit 1
+
+# Remove old state
+rm -f changed
+
+# Create the void-packages directory if it doesn't exit
+mkdir -p void-packages
+cd void-packages || exit 2
+
+# Do we actually have the repo yet?
+if [ ! -d srcpkgs ] ; then
+    # No, clone a fresh copy
+    git clone https://github.com/void-linux/void-packages .
+
+    # On bootstrap we need to build everything
+    cp ../packages.list ../changed
+else
+    # Yes, pull in the changes for this run
+    git reset --hard HEAD
+    git pull | tee ../changed
+fi
+
+cp -r ../overlay/*/* srcpkgs/
+
+# Does this system use another set of repos
+if [ -d /etc/xbps.d ] ; then
+    cat /etc/xbps.d/* > etc/repos-remote.conf
+    # If this platform is 64 bit, override those as well
+    if [ "$(xbps-uhelper arch)" = "x86_64" ] ; then
+        cat /etc/xbps.d/* > etc/repos-remote-x86_64.conf
+    fi
+
+    # The bootstrap config is loaded seperately
+    if [ -f /etc/xbps.d/00-repository-main.conf ] ; then
+        repo="$(sed 's/^.*=//' < /etc/xbps.d/00-repository-main.conf)"
+        printf 'XBPS_INSTALL_ARGS="--repository=%s --repository=%s/musl"\n' "${repo}" "${repo}" > etc/conf
+    fi
+fi
+
+# Do we have a live build environment
+if [ ! -d masterdir ] ; then
+    # No masterdir, go ahead and bootstrap it
+    ./xbps-src binary-bootstrap
+else
+    # Have a masterdir, keep it up to date
+    ./xbps-src bootstrap-update
+fi
+
+# Apply provided config file if it exists
+if [ -f ../xbps-src.conf ] ; then
+    cat ../xbps-src.conf >> etc/conf
+fi
+
+if [ -z "$@" ] ; then
+    while read -r package ; do
+        if grep "${package}" ../changed; then
+		./xbps-src pkg "${package}"
+        fi
+    done < ../packages.list
+else
+	for pkg in "$@"; do
+		./xbps-src pkg "${pkg}"
+	done
+fi
