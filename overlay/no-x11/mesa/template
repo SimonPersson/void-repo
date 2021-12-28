@@ -3,16 +3,19 @@ pkgname=mesa
 version=21.3.2
 revision=1
 build_style=meson
-configure_args="--buildtype=release -Dglx-read-only-text=true -Dplatforms=wayland -Dglx=disabled -Degl=enabled -Dvalgrind=false -Dzstd=false"
+configure_args="-Dglvnd=true -Dshared-glapi=enabled -Dgbm=enabled -Degl=enabled
+ -Dosmesa=true -Dgles1=enabled -Dgles2=enabled -Dglx=disabled -Ddri3=enabled
+ -Dlmsensors=enabled -Dplatforms=wayland
+ -Dllvm=enabled -Db_lto=false -Dcpp_std=gnu++14"
 hostmakedepends="gettext flex llvm pkg-config python3-Mako glslang
  wayland-protocols wayland-devel"
-makedepends="elfutils-devel expat-devel 
+makedepends="elfutils-devel expat-devel
  libatomic-devel libdrm-devel libffi-devel libva-devel
- libxshmfence-devel ncurses-devel zlib-devel
+ ncurses-devel zlib-devel
  wayland-devel wayland-protocols llvm libsensors-devel
- libzstd-devel libxml2-devel lua53-devel
+ libglvnd-devel libzstd-devel libxml2-devel lua53-devel
  libarchive-devel"
-depends=""
+depends="libglvnd"
 short_desc="Graphics library similar to SGI's OpenGL"
 maintainer="q66 <daniel@octaforge.org>"
 license="MIT, LGPL-2.1-or-later"
@@ -34,9 +37,10 @@ case "$XBPS_TARGET_MACHINE" in
 esac
 
 # Set subpackages manually to set proper rdeps in 32bit pkgs.
-subpackages="libglapi libgbm libgbm-devel"
+subpackages="libglapi libgbm libgbm-devel libOSMesa"
 
-provides="libGL-7.11_1 libEGL-7.11_1 libGLES-7.11_1"
+# Replace old mesa pkgs, superseded by libglvnd.
+replaces="libGL>=10_1<19.2.5_2 libEGL>=10_1<19.2.5_2 libGLES>=10_1<19.2.5_2"
 
 # Driver configuration
 # Check for correctness on major mesa version updates
@@ -82,6 +86,7 @@ if [ "$_have_amd" ]; then
 	_dri_drivers+=",r100,r200"
 	subpackages+=" mesa-vulkan-radeon"
 	# transitional dummy packages
+	subpackages+=" mesa-ati-dri"
 fi
 
 if [ "$_have_intel" ]; then
@@ -91,6 +96,7 @@ if [ "$_have_intel" ]; then
 	_dri_drivers+=",i915,i965"
 	subpackages+=" mesa-vulkan-intel"
 	# transitional dummy packages
+	subpackages+=" mesa-intel-dri"
 fi
 
 if [ "$_have_nv" ]; then
@@ -103,6 +109,7 @@ if [ "$_have_nv" ]; then
 		_dri_drivers+=",nouveau"
 	fi
 	# transitional dummy packages
+	subpackages+=" mesa-nouveau-dri"
 fi
 
 if [ "$_have_arm" ]; then
@@ -140,12 +147,7 @@ if [ "$_have_opencl" ]; then
 	configure_args+=" -Dgallium-opencl=icd"
 fi
 
-if [ "$_have_hwdec" ]; then
-	configure_args+=" -Dgallium-vdpau=disabled -Dgallium-va=enabled -Dgallium-xvmc=disabled"
-	subpackages+=" mesa-vaapi"
-else
-	configure_args+=" -Dgallium-vdpau=disabled -Dgallium-va=disabled -Dgallium-xvmc=disabled"
-fi
+configure_args+=" -Dgallium-vdpau=disabled -Dgallium-va=disabled -Dgallium-xvmc=disabled"
 
 # empty values introduced by leading comma are not allowed; the whole enumeration can be empty
 # _gallium_drivers is not affected by this problem
@@ -225,6 +227,7 @@ libglapi_package() {
 	# systems with libglapi-32bit after the switch to glvnd
 	# see 927f17347f9c646047c65312c8e8ce1ad88b7832
 	# it can be removed when glibc multilib (with *-32bit packages) is removed
+	depends="libglvnd"
 	short_desc="Free implementation of the GL API - shared library"
 	pkg_install() {
 		vmove "usr/lib/libglapi.so.*"
@@ -248,8 +251,15 @@ libgbm-devel_package() {
 	}
 }
 
+libOSMesa_package() {
+	short_desc="Mesa Off-Screen interface library"
+	pkg_install() {
+		vmove "usr/lib/libOSMesa.so.*"
+	}
+}
+
 MesaLib-devel_package() {
-	depends="mesa>=${version}_${revision} 
+	depends="mesa>=${version}_${revision} libOSMesa>=${version}_${revision}
 	 libgbm-devel>=${version}_${revision}"
 	if [ "$_have_vmware" ]; then
 		depends+=" libxatracker>=${version}_${revision}"
@@ -257,11 +267,13 @@ MesaLib-devel_package() {
 	if [ "$_have_opencl" ]; then
 		depends+=" mesa-opencl>=${version}_${revision}"
 	fi
-	depends+=" libdrm-devel"
+	depends+=" libdrm-devel libglvnd-devel"
 	short_desc+=" - development files"
 	pkg_install() {
 		vmove usr/include
 		vmove usr/lib/pkgconfig
+		vmove usr/lib/libEGL_mesa.so
+		vmove usr/lib/libOSMesa.so
 		vmove usr/lib/libglapi.so
 		if [ "$_have_vmware" ]; then
 			vmove usr/lib/libxatracker.so
@@ -306,6 +318,20 @@ mesa-vaapi_package() {
 	}
 }
 
+mesa-vdpau_package() {
+	short_desc="Mesa VDPAU drivers"
+	pkg_install() {
+		vmove "usr/lib/vdpau/libvdpau_*"
+	}
+}
+
+mesa-XvMC_package() {
+	short_desc="Mesa XvMC drivers"
+	pkg_install() {
+		vmove "usr/lib/libXvMC*"
+	}
+}
+
 mesa-vulkan-intel_package() {
 	short_desc="Mesa Intel Vulkan driver"
 	pkg_install() {
@@ -330,6 +356,16 @@ mesa-vulkan-overlay-layer_package() {
 		vmove "usr/bin/mesa-overlay-control.py"
 		vmove "usr/lib/libVkLayer_*.so"
 	}
+}
+
+mesa-ati-dri_package() {
+	build_style=meta
+	lib32mode=full
+	short_desc="Mesa DRI drivers for ATI GPUs (transitional dummy package)"
+	depends="mesa-dri mesa-vulkan-radeon"
+	if [ "$_have_hwdec" ]; then
+		depends+=" mesa-vaapi mesa-vdpau mesa-XvMC"
+	fi
 }
 
 mesa-etnaviv-dri_package() {
@@ -365,6 +401,16 @@ mesa-lima-dri_package() {
 	lib32mode=full
 	short_desc="Mesa DRI drivers for Mali GPUs (Utgard) (transitional dummy package)"
 	depends="mesa-dri"
+}
+
+mesa-nouveau-dri_package() {
+	build_style=meta
+	lib32mode=full
+	short_desc="Mesa DRI drivers for NVIDIA GPUs (transitional dummy package)"
+	depends="mesa-dri"
+	if [ "$_have_hwdec" ]; then
+		depends+=" mesa-vaapi mesa-vdpau mesa-XvMC"
+	fi
 }
 
 mesa-panfrost-dri_package() {
