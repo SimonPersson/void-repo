@@ -189,3 +189,6 @@ zsh
 zstd
 flac2opus
 pash
+ffmpeg
+libglvnd
+libva
