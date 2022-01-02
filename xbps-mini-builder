@@ -20,7 +20,12 @@ if [ ! -d srcpkgs ] ; then
 else
     # Yes, pull in the changes for this run
     git reset --hard HEAD
-    git pull | tee ../changed
+    git pull
+    # Build packages that needs to be updated
+    comm -3 \
+	    <(xbps-install --repository=https://alpha.de.repo.voidlinux.org/current -Sun | rev | cut -d- -f2- | rev | sort) \
+	    <(cd .. ; ./outdated.sh | cut -d' ' -f1 | sort) \
+	    > ../changed
 fi
 
 cp -r ../overlay/*/* srcpkgs/
