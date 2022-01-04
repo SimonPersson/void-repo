@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Jump to the directory that owns this script
 cd "${0%/*}" || exit 1
